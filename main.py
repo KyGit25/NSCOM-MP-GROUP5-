@@ -29,18 +29,6 @@ def connect_to_server(server_ip):
     client_socket.settimeout(5)  # timeout after 5 seconds
 
     print(f"Connecting to TFTP server at {server_ip}:{TFTP_PORT}...")
-
-    # message = b"Hello TFTP Server!"  # example lang (invalid message)
-    # client_socket.sendto(message, (server_ip, TFTP_PORT))  # send message
-    #
-    # try:
-    #     response, server_address = client_socket.recvfrom(BUFFER_SIZE)
-    #     print("Server Response:", response)
-    # except socket.timeout:
-    #     print("No response from the server. Timeout.")
-    # finally:
-    #     client_socket.close()
-
     return client_socket
 
 if __name__ == "__main__":
@@ -57,7 +45,7 @@ if __name__ == "__main__":
             loop_flag = False
         elif user_input is not None:
             client_socket = connect_to_server(user_input)
-            client_operations.menu(client_socket, user_input)
+            client_operations.operations_proper(client_socket, user_input)
             client_socket.close()
         else:
             print("Incorrect IP address format! Try again!\n")
