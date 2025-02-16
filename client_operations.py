@@ -30,6 +30,7 @@ def create_packet(filename, opcode, mode, blksize=None, tsize=None):
     :param opcode: the opcode of the request (1 for RRQ, 2 for WRQ)
     :param mode:
     :param blksize: the block size to be used
+    :param tsize:
     :return:
     '''
     request = struct.pack(f'!H{len(filename) + 1}s{len(mode) + 1}s', opcode, filename.encode(), mode.encode())
@@ -64,6 +65,11 @@ def send_packet(client_socket, server_address, packet):
             if response[:2] == b'\x00\x06':  # OACK Opcode = 6
                 print("Option Acknowledgment (OACK) received.")
                 print("OACK Data:", response[2:])
+
+                # Send ACK for OACK (block number 0)
+                ack_packet = struct.pack('!HH', OPCODE_ACK, 0)
+                client_socket.sendto(ack_packet, (server_address, TFTP_PORT))
+
                 return True
             elif response[:2] == b'\x00\x05':  # Error Opcode = 5
                 error_code = struct.unpack('!H', response[2:4])[0]
@@ -84,11 +90,89 @@ def send_packet(client_socket, server_address, packet):
             print(f"Error: {e}")
             return False
 
-        finally:
-            client_socket.close()
-
     print(f"Max retries ({retries}/{MAX_RETRIES}) has been reached. Server is unresponsive.")
     return False
+
+def download_file(client_socket, filename, server_address, blksize=512):
+    block_num = 1
+    file_data = b''
+
+    print("Waiting for first data packet...")
+
+    while True:
+        try:
+            packet, addr = client_socket.recvfrom(blksize + 4)
+            opcode = struct.unpack('!H', packet[:2])[0]
+
+            if opcode == OPCODE_DATA:
+                received_block_num = struct.unpack('!H', packet[2:4])[0]
+                data = packet[4:]
+
+                if received_block_num == block_num:
+                    file_data += data
+
+                    # Send ACK for received block
+                    ack_packet = struct.pack('!HH', OPCODE_ACK, block_num)
+                    client_socket.sendto(ack_packet, (server_address, TFTP_PORT))
+                    block_num += 1
+
+                    # Last packet if data is less than block size
+                    if len(data) < blksize:
+                        with open(filename, 'wb') as file:
+                            file.write(file_data)
+                        print(f"File '{filename}' downloaded successfully.")
+                        return True
+
+            elif opcode == OPCODE_ERROR:
+                error_code = struct.unpack('!H', packet[2:4])[0]
+                error_msg = packet[4:].decode()
+                print(f"TFTP Error {error_code}: {ERROR_MESSAGES.get(error_code, error_msg)}")
+                return False
+
+        except socket.timeout:
+            print("Timeout while waiting for data. Retrying...")
+            continue
+
+        except Exception as e:
+            print(f"An error occurred while receiving file: {e}")
+            return False
+
+
+def upload_file(client_socket, filename, server_address, blksize=512):
+    block_num = 0
+    try:
+        with open(filename, 'rb') as file:
+            while True:
+                block_num += 1
+                data = file.read(blksize)
+                data_packet = struct.pack('!HH', OPCODE_DATA, block_num) + data
+                client_socket.sendto(data_packet, (server_address, TFTP_PORT))
+                while True:
+                    try:
+                        packet, addr = client_socket.recvfrom(4)
+                        opcode = struct.unpack('!H', packet[:2])[0]
+                        if addr != server_address:
+                            continue
+                        if opcode == OPCODE_ACK:
+                            received_block_num = struct.unpack('!H', packet[2:4])[0]
+                            if received_block_num == block_num:
+                                break
+                        elif opcode == OPCODE_ERROR:
+                            error_code = struct.unpack('!H', packet[2:4])[0]
+                            error_msg = packet[4:].decode()
+                            print(f"TFTP Error {error_code}: {ERROR_MESSAGES.get(error_code, error_msg)}")
+                            return False
+                    except socket.timeout:
+                        client_socket.sendto(data_packet, (server_address, TFTP_PORT))
+                if len(data) < blksize:
+                    print(f"File '{filename}' uploaded successfully.")
+                    return True
+    except FileNotFoundError:
+        print(f"File '{filename}' not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred while uploading file: {e}")
+        return False
 
 def operations_proper(client_socket, server_address):
     loop_flag = True
@@ -127,7 +211,7 @@ def operations_proper(client_socket, server_address):
                 # prompt for blocksize afterwards
                 blksize_input = input("Enter blocksize (leave blank to skip): ")
                 # turn string input into integer
-                blksize = int(blksize_input) if blksize_input.isdigit() else None
+                blksize = int(blksize_input) if blksize_input.isdigit() else 512
 
                 # determine tsize for uploads
                 tsize = None
@@ -143,7 +227,15 @@ def operations_proper(client_socket, server_address):
                 # try sending the packet
                 try:
                     if send_packet(client_socket, server_address, packet):
-                        print("Gumana.")
+                        print("Request packet sent successfully.")
+
+                        # If RRQ, initiate download
+                        if request_type == "RRQ":
+                            download_file(client_socket, filename, server_address, blksize)
+
+                        # If WRQ, initiate upload
+                        elif request_type == "WRQ":
+                            upload_file(client_socket, filename, server_address, blksize)
                     else:
                         print("Unable to reach TFTP server or received an error.")
                 except Exception as e:
@@ -151,6 +243,7 @@ def operations_proper(client_socket, server_address):
 
         elif request_type == "EXIT":
             print("Disconnecting from the server...")
+            client_socket.close()
             loop_flag = False
         else:
             print("Invalid request type.")
