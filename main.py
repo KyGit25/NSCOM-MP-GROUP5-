@@ -46,7 +46,6 @@ if __name__ == "__main__":
         elif user_input is not None:
             client_socket = connect_to_server(user_input)
             client_operations.operations_proper(client_socket, user_input)
-            client_socket.close()
         else:
             print("Incorrect IP address format! Try again!\n")
             loop_flag = True
