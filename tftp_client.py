@@ -2,6 +2,7 @@ import socket
 import struct
 import os
 import sys
+import ipaddress
 
 TFTP_PORT = 69
 OPCODE_RRQ = 1  # Read request
@@ -23,6 +24,19 @@ ERROR_MESSAGES = {
     6: "File already exists",
     7: "No such user"
 }
+
+def is_valid_ip(ip_address):
+    """
+    A function used to validate the parameter 'ip_address'
+    :param ip_address: the "address" to be validated
+    :return: True if the given 'ip_address' is a valid IP address
+    """
+    try:
+        # check if the given ip_address is a correct IP address
+        ipaddress.ip_address(ip_address)
+        return True
+    except ValueError:
+        return False
 
 def send_request(sock, server_ip, filename, mode, opcode, blocksize=None, tsize=None):
     """
@@ -209,24 +223,72 @@ def tftp_client(server_ip, operation, local_filename, remote_filename):
             # run the send_request(), then try to send file
             send_request(sock, server_ip, remote_filename, mode, OPCODE_WRQ, BLOCK_SIZE)
             send_file(sock, local_filename, server_ip)
-        else:
-            # error handling for other operation input
-            print("Invalid operation. Use 'get' or 'put'.")
+    except Exception as e:
+        print(f"An error occurred while receiving file: {e}")
+        return False
     # close the socket after the operation
     finally:
         sock.close()
 
 if __name__ == "__main__":
+    loop_flag = True
+    local_filename = ""
+    remote_filename = ""
+
     # get the necessary inputs
-    server_ip = input("Enter TFTP server IP address: ")
-    operation = input("Enter operation (get/put): ")
-    local_filename = input("Enter local filename: ")
-    remote_filename = input("Enter filename to use on the server: ")
+    while True:
+        print("Enter 'exit' to exit the program.")
+        server_ip = input("Enter TFTP server IP address: ")
 
-    # error handling for invalid inputs
-    if not server_ip or operation not in ["get", "put"] or not local_filename or not remote_filename:
-        print("Error: Invalid input. Please provide valid details.")
-        sys.exit(1)
+        if is_valid_ip(server_ip):
+            while True:
+                operation = input("\nEnter operation (get/put): ").strip().lower()
 
-    # run the main program
-    tftp_client(server_ip, operation, local_filename, remote_filename)
+                if operation in ['get', 'put']:
+                    while True:
+                        if operation == 'get':
+                            print("\nEnter 'exit' to return.")
+                            remote_filename = input("Enter filename to get from the server: ")
+
+                            if remote_filename.lower() == 'exit':
+                                print("\nReturning...")
+                                break
+
+                            print("\nEnter 'exit' to return.")
+                            local_filename = input("Enter filename to use locally: ")
+
+                            if local_filename.lower() == 'exit':
+                                print("\nReturning...")
+                                break
+
+                        elif operation == 'put':
+                            print("\nEnter 'exit' to return.")
+                            local_filename = input("Enter filename to get locally: ")
+
+                            if local_filename.lower() == 'exit':
+                                print("\nReturning...")
+                                break
+
+                            print("\nEnter 'exit' to return.")
+                            remote_filename = input("Enter filename to use on the server: ")
+
+                            if remote_filename.lower() == 'exit':
+                                print("\nReturning...")
+                                break
+
+                        if not local_filename or not remote_filename:
+                            print("\nError: Invalid filename!")
+                        elif local_filename.lower() == 'exit' or remote_filename.lower() == 'exit':
+                            break
+                        else:
+                            # run the main program
+                            tftp_client(server_ip, operation, local_filename, remote_filename)
+                else:
+                    print("Error: Invalid operation!")
+                    continue
+        elif server_ip.lower() == 'exit':
+            print("\nExiting program...")
+            break
+        else:
+            print("\nError: Invalid IP address!")
+            continue
