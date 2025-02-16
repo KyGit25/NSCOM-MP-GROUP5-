@@ -225,31 +225,38 @@ def tftp_client(server_ip, operation, local_filename, remote_filename):
             send_file(sock, local_filename, server_ip)
     except Exception as e:
         print(f"An error occurred while receiving file: {e}")
-        return False
     # close the socket after the operation
     finally:
         sock.close()
 
 if __name__ == "__main__":
-    loop_flag = True
+    # declare as empty strings
     local_filename = ""
     remote_filename = ""
 
-    # get the necessary inputs
+    # loop for invalid inputs
     while True:
         print("Enter 'exit' to exit the program.")
         server_ip = input("Enter TFTP server IP address: ")
 
+        # check if user input is a valid ip address
         if is_valid_ip(server_ip):
+            # continue with the program, connect to server if it is valid
+            print(f"Connecting to TFTP server at {server_ip}:{TFTP_PORT}...\n")
+            # loop for invalid operation input
             while True:
-                operation = input("\nEnter operation (get/put): ").strip().lower()
+                operation = input("Enter operation (get/put): ").strip().lower()
 
+                # check if valid input
                 if operation in ['get', 'put']:
+                    # loop for invalid inputs
                     while True:
+                        # get necessary filenames
                         if operation == 'get':
                             print("\nEnter 'exit' to return.")
                             remote_filename = input("Enter filename to get from the server: ")
 
+                            # break out of loop if 'exit' is entered
                             if remote_filename.lower() == 'exit':
                                 print("\nReturning...")
                                 break
@@ -257,6 +264,7 @@ if __name__ == "__main__":
                             print("\nEnter 'exit' to return.")
                             local_filename = input("Enter filename to use locally: ")
 
+                            # break out of loop if 'exit' is entered
                             if local_filename.lower() == 'exit':
                                 print("\nReturning...")
                                 break
@@ -265,30 +273,34 @@ if __name__ == "__main__":
                             print("\nEnter 'exit' to return.")
                             local_filename = input("Enter filename to get locally: ")
 
+                            # break out of loop if 'exit' is entered
                             if local_filename.lower() == 'exit':
                                 print("\nReturning...")
                                 break
 
                             print("\nEnter 'exit' to return.")
                             remote_filename = input("Enter filename to use on the server: ")
-
+                            
+                            # break out of loop if 'exit' is entered
                             if remote_filename.lower() == 'exit':
                                 print("\nReturning...")
                                 break
 
                         if not local_filename or not remote_filename:
                             print("\nError: Invalid filename!")
-                        elif local_filename.lower() == 'exit' or remote_filename.lower() == 'exit':
-                            break
+                        # run main program if correct inputs
                         else:
                             # run the main program
                             tftp_client(server_ip, operation, local_filename, remote_filename)
+                # error message for invalid operation input
                 else:
                     print("Error: Invalid operation!")
                     continue
+        # close the program if 'exit' is entered
         elif server_ip.lower() == 'exit':
             print("\nExiting program...")
             break
+        # error message for invalid ip address input
         else:
             print("\nError: Invalid IP address!")
             continue
