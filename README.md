@@ -197,10 +197,3 @@ udp port 69
 | 4  | 127.0.0.1  | 127.0.0.1   | TFTP    | Acknowledgment (ACK) Block #1    |
 | 5  | 127.0.0.1  | 127.0.0.1   | TFTP    | Final Data Block #N (<512 bytes) |
 | 6  | 127.0.0.1  | 127.0.0.1   | TFTP    | Acknowledgment (ACK) Final Block |
-
----
-
-## Deliverables
-- **Full source code**
-- **Comprehensive README with setup instructions**
-- **Test cases covering all error-handling scenarios**
