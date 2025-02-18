@@ -33,6 +33,8 @@ def send_request(sock, server_ip, filename, mode, opcode, blocksize=None, tsize=
         request += b'blksize\x00' + str(blocksize).encode() + b'\x00'
     if tsize and opcode == OPCODE_WRQ:
         request += b'tsize\x00' + str(tsize).encode() + b'\x00'
+
+    print(f"Request Packet: {request}")
     sock.sendto(request, (server_ip, TFTP_PORT))
 
 def handle_oack(sock, addr, blocksize):
@@ -153,17 +155,19 @@ def send_file(sock, filename, server_ip):
             while True:
                 try:
                     # Wait for ACK
-                    ack, _ = sock.recvfrom(4 + blocksize)
-                    print(f"Received packet: {ack} (Length: {len(ack)}), {block_number}")
-                    opcode, ack_block = struct.unpack('!HH', ack[:4])
-                    print(f"block: {ack_block}")
+                    ack, _ = sock.recvfrom(blocksize + 4)
 
-                    # Check if ACK is received for the correct block number
-                    if opcode == OPCODE_ACK and ack_block == block_number:
-                        print(f"ACK received for block {block_number}")
-                        break
+                    if ack[1] == 5:  # Check if it's an error packet (opcode 5)
+                        error_code, = struct.unpack('!H', ack[2:4])
+                        print(f"Error: {ERROR_MESSAGES.get(error_code, 'Unknown error')}")
                     else:
-                        print(f"Unexpected packet received, ignoring...")
+                        opcode, ack_block = struct.unpack('!HH', ack)
+                        # Check if ACK is received for the correct block number
+                        if opcode == OPCODE_ACK and ack_block == block_number:
+                            print(f"ACK received for block {block_number}")
+                            break
+                        else:
+                            print(f"Unexpected packet received, ignoring...")
 
                 except socket.timeout:
                     retries += 1
