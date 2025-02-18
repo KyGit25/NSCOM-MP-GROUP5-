@@ -83,14 +83,20 @@ def handle_tftp_error(data):
     """
     Handles received TFTP error packets and prints appropriate error messages.
     :param data: The received error packet.
-    :return: None
+    :return: None.
+    
+    Features:
+    - Specifically handles "File Not Found" errors.
+    - Extracts and displays error codes with corresponding messages.
     """
-    # Extract error code and error message
     error_code = struct.unpack('!H', data[2:4])[0]
     error_msg = data[4:].decode(errors='ignore').strip("\x00")
+
+    if error_code == 1:
+        print("Error: The requested file was not found on the server.")
+    else:
+        print(f"TFTP Error {error_code}: {ERROR_MESSAGES.get(error_code, 'Unknown error')}")
     
-    # Print error details
-    print(f"TFTP Error {error_code}: {ERROR_MESSAGES.get(error_code, 'Unknown error')}")
     print(f"Server message: {error_msg}")
 
 def receive_file(sock, filename, server_ip):
@@ -101,32 +107,34 @@ def receive_file(sock, filename, server_ip):
     :param server_ip: The IP address of the server.
     :return: None. If an error occurs, the function will print an error message and return early.
     """
-    
-    global BLOCK_SIZE  # Update block size if negotiated
+
+    global BLOCK_SIZE
     block_number = 1
     retries = 0
     temp_filename = filename + ".tmp"
 
     try:
-        # Open a temporary file to store the incoming data
         with open(temp_filename, 'wb') as f:
             while True:
                 try:
-                    # Receive a packet from the server
                     data, addr = sock.recvfrom(4 + BLOCK_SIZE)
                     opcode = struct.unpack('!H', data[:2])[0]
 
                     if opcode == OPCODE_OACK:
-                        # Process OACK packet to handle option negotiations
                         process_oack(data)
                         sock.sendto(struct.pack('!HH', OPCODE_ACK, 0), addr)
-                        continue  # Continue to receive actual data packets
+                        continue
 
                     elif opcode == OPCODE_DATA:
-                        # Handle received data block
                         recv_block_number = struct.unpack('!H', data[2:4])[0]
+
+                        # Ignore duplicate data blocks
+                        if recv_block_number < block_number:
+                            print(f"Warning: Duplicate block {recv_block_number} received, ignoring...")
+                            continue
+
                         if recv_block_number == block_number:
-                            f.write(data[4:])  # Write data excluding the header
+                            f.write(data[4:])
                             sock.sendto(struct.pack('!HH', OPCODE_ACK, block_number), addr)
                             block_number += 1
                             retries = 0
@@ -149,7 +157,6 @@ def receive_file(sock, filename, server_ip):
         print(f"Unexpected error: {e}")
         return
 
-    # Rename the temporary file to the desired filename after successful download
     os.rename(temp_filename, filename)
     print("Download complete!")
 
@@ -162,28 +169,25 @@ def send_file(sock, filename, server_ip):
     :return: None. If an error occurs during the file transfer, the function will print an 
              error message and return early.
     """
+
     global BLOCK_SIZE
 
-    # Check if the file exists; if not, return an error
     if not os.path.exists(filename):
         print("Error: File not found.")
         return
 
-    # Get the size of the file
     filesize = os.path.getsize(filename)
-
-    # Send the WRQ request with the file size and block size options
+    
+    # Send write request (WRQ) with block size and file size
     send_request(sock, server_ip, filename, "octet", OPCODE_WRQ, BLOCK_SIZE, filesize)
 
     try:
-        # Wait for either an OACK or an ACK from the server before proceeding with file transfer
+        # Wait for response (ACK or OACK)
         response, addr = sock.recvfrom(4 + BLOCK_SIZE)
         opcode = struct.unpack('!H', response[:2])[0]
 
         if opcode == OPCODE_OACK:
-            # Process the OACK and adjust block size if necessary
             process_oack(response)
-            # Acknowledge the OACK to proceed
             sock.sendto(struct.pack('!HH', OPCODE_ACK, 0), addr)
         elif opcode == OPCODE_ACK:
             _, ack_block = struct.unpack('!HH', response)
@@ -198,9 +202,10 @@ def send_file(sock, filename, server_ip):
         print("Error: No response from server after WRQ.")
         return
 
-    # Start sending file in blocks
     with open(filename, 'rb') as f:
         block_number = 1
+        retries = 0
+
         while True:
             data_block = f.read(BLOCK_SIZE)
             packet = struct.pack('!HH', OPCODE_DATA, block_number) + data_block
@@ -212,13 +217,22 @@ def send_file(sock, filename, server_ip):
                 _, ack_block = struct.unpack('!HH', ack)
 
                 if ack_block != block_number:
-                    print("Error: Incorrect ACK block received.")
-                    return
-            except socket.timeout:
-                print("Error: Timeout while waiting for ACK.")
-                return
+                    print(f"Warning: Unexpected ACK {ack_block}, expected {block_number}. Retrying...")
+                    retries += 1
+                    if retries >= MAX_RETRIES:
+                        print("Error: Maximum retries reached. Upload aborted.")
+                        return
+                    continue  # Retransmit the block
 
-            # If last block is exactly BLOCK_SIZE, send an empty data packet
+                retries = 0  # Reset retry counter
+            except socket.timeout:
+                print(f"Warning: Timeout while waiting for ACK for block {block_number}. Retrying...")
+                retries += 1
+                if retries >= MAX_RETRIES:
+                    print("Error: Maximum retries reached. Upload aborted.")
+                    return
+                continue  # Retransmit the block
+
             if len(data_block) < BLOCK_SIZE:
                 if len(data_block) == BLOCK_SIZE:
                     sock.sendto(struct.pack('!HH', OPCODE_DATA, block_number + 1), (server_ip, TFTP_PORT))
@@ -227,7 +241,6 @@ def send_file(sock, filename, server_ip):
             block_number += 1
 
     print("Upload complete!")
-
 
 def tftp_client(server_ip, operation, local_filename, remote_filename):
     """
