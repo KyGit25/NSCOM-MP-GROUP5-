@@ -164,9 +164,7 @@ Error: Maximum retries reached, aborting upload.
 
 ### 2. Handling File Not Found (Server-Side)
 **Test Case:** Attempting to download a non-existent file
-```bash
-python tftp_client.py
-```
+
 **Input:**
 ```
 Write 'exit' to disconnect from the server.
@@ -188,8 +186,6 @@ Error: File not found
 
 ### 3. Handling Duplicate ACKs
 **Test Case:** Server sends duplicate ACKs
-
-**How to Simulate:** Modify the TFTP server to send duplicate ACKs.
 
 **Expected Output:**
 ```
