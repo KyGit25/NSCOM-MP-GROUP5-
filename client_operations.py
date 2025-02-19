@@ -275,10 +275,10 @@ def operations_proper(client_socket, server_address):
     while True:
         # user will input operation
         print("\nWrite 'exit' to disconnect from the server.")
-        request_type = input("Enter operation (RRQ for download, WRQ for upload): ").strip().upper()
+        request_type = input("Enter operation (get for download, put for upload): ").strip().lower()
 
         # if input is correct
-        if request_type == "RRQ" or request_type == "WRQ":
+        if request_type == "get" or request_type == "put":
             # loop for parsing filename inputs
             while True:
                 # get filename input
@@ -290,8 +290,8 @@ def operations_proper(client_socket, server_address):
                     print("Returning to main menu...")
                     break
                 else:
-                    # check if file exists only for WRQ (upload)
-                    if request_type == "WRQ":
+                    # check if file exists only for put (upload)
+                    if request_type == "put":
                         if os.path.isfile(filename):
                             # break out of loop if file exists
                             break
@@ -299,7 +299,7 @@ def operations_proper(client_socket, server_address):
                             # print error message if file does not exist
                             print("Error: File not found locally.")
                             continue
-                    # break loop if request is RRQ
+                    # break loop if request is get
                     else:
                         break
 
@@ -311,16 +311,16 @@ def operations_proper(client_socket, server_address):
 
                 # determine tsize for uploads
                 tsize = None
-                if request_type == "WRQ" and os.path.isfile(filename):
+                if request_type == "put" and os.path.isfile(filename):
                     tsize = os.path.getsize(filename)
 
                 try:
                     # create and send packet based on request type
-                    if request_type == "RRQ":
+                    if request_type == "get":
                         send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_RRQ,
                                     blocksize=blksize)
                         receive_file(client_socket, filename, server_address)
-                    elif request_type == "WRQ":
+                    elif request_type == "put":
                         send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_WRQ,
                                     blocksize=blksize, tsize=tsize)
                         send_file(client_socket, filename, server_address)
@@ -331,7 +331,7 @@ def operations_proper(client_socket, server_address):
                 except Exception as e:
                     print(f"An error occurred during communication: {e}")
         # check if input for operation is 'exit', then disconnect from server
-        elif request_type == "EXIT":
+        elif request_type == "exit":
             print("Disconnecting from the server...")
             client_socket.close()
             break
