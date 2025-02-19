@@ -304,32 +304,33 @@ def operations_proper(client_socket, server_address):
                     else:
                         break
 
-            # prompt for blocksize afterwards
-            blksize_input = input("Enter blocksize (leave blank to skip): ")
-            # turn string input into integer
-            blksize = int(blksize_input) if blksize_input.isdigit() else 512
+            if filename != 'exit':
+                # prompt for blocksize afterwards
+                blksize_input = input("Enter blocksize (leave blank to skip): ")
+                # turn string input into integer
+                blksize = int(blksize_input) if blksize_input.isdigit() else 512
 
-            # determine tsize for uploads
-            tsize = None
-            if request_type == "WRQ" and os.path.isfile(filename):
-                tsize = os.path.getsize(filename)
+                # determine tsize for uploads
+                tsize = None
+                if request_type == "WRQ" and os.path.isfile(filename):
+                    tsize = os.path.getsize(filename)
 
-            try:
-                # create and send packet based on request type
-                if request_type == "RRQ":
-                    send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_RRQ,
-                                blocksize=blksize)
-                    receive_file(client_socket, filename, server_address)
-                elif request_type == "WRQ":
-                    send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_WRQ,
-                                blocksize=blksize, tsize=tsize)
-                    send_file(client_socket, filename, server_address)
-                else:
-                    # error handling if unexpected issue comes up
-                    print("Unable to reach TFTP server or received an error.")
-            # error handling if unexpected issue comes up
-            except Exception as e:
-                print(f"An error occurred during communication: {e}")
+                try:
+                    # create and send packet based on request type
+                    if request_type == "RRQ":
+                        send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_RRQ,
+                                    blocksize=blksize)
+                        receive_file(client_socket, filename, server_address)
+                    elif request_type == "WRQ":
+                        send_request(client_socket, server_address, filename, mode='octet', opcode=OPCODE_WRQ,
+                                    blocksize=blksize, tsize=tsize)
+                        send_file(client_socket, filename, server_address)
+                    else:
+                        # error handling if unexpected issue comes up
+                        print("Unable to reach TFTP server or received an error.")
+                # error handling if unexpected issue comes up
+                except Exception as e:
+                    print(f"An error occurred during communication: {e}")
         # check if input for operation is 'exit', then disconnect from server
         elif request_type == "EXIT":
             print("Disconnecting from the server...")
