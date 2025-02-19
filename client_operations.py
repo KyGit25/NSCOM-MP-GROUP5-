@@ -240,7 +240,7 @@ def send_file(sock, filename, server_ip):
                             break
                         # else if it is an incorrect block (not the same block numbers on both sides), retry
                         else:
-                            print(f"Unexpected packet received, ignoring...")
+                            print(f"Warning: Unexpected packet received, retrying...")
                 # timeout handling
                 except socket.timeout:
                     # increments the retries counter as program retries the request

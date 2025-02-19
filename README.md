@@ -37,7 +37,7 @@ This project is a **TFTP (Trivial File Transfer Protocol) client** implemented i
    ```
 3. **Navigate to the project directory and run the client**
    ```bash
-   python tftp_client.py
+   python main.py
    ```
 
 ---
@@ -64,14 +64,22 @@ This project is a **TFTP (Trivial File Transfer Protocol) client** implemented i
 ### Running the TFTP Client
 Run the script and follow the prompts:
 ```bash
-python tftp_client.py
+python main.py
 ```
 Example input:
 ```
+TFTP Client Application
+
+Write 'exit' to close the program.
 Enter TFTP server IP address: 127.0.0.1
-Enter operation (get/put): get
-Enter filename to get from the server: test.txt
-Enter filename to use locally: downloaded_test.txt
+Connecting to TFTP server at 127.0.0.1:69...
+
+Write 'exit' to disconnect from the server.
+Enter operation (get for download, put for upload): get
+
+Write 'exit' to return to main menu.
+Enter filename: FileA.jpg
+Enter blocksize (leave blank to skip):
 ```
 
 ---
@@ -80,27 +88,34 @@ Enter filename to use locally: downloaded_test.txt
 
 #### Download a File from the Server (`get`)
 ```
-Enter TFTP server IP address: 127.0.0.1
-Enter operation (get/put): get
-Enter filename to get from the server: server_file.bin
-Enter filename to use locally: downloaded.bin
+Write 'exit' to disconnect from the server.
+Enter operation (get for download, put for upload): get
+
+Write 'exit' to return to main menu.
+Enter filename: FileA.jpg
+Enter blocksize (leave blank to skip):
 ```
 **Expected Output:**
 ```
-Connecting to TFTP server at 127.0.0.1:69...
+Negotiated blocksize: 512
+Starting download of FileA.jpg...
 Download complete!
 ```
 
 #### Upload a File to the Server (`put`)
 ```
-Enter TFTP server IP address: 127.0.0.1
-Enter operation (get/put): put
-Enter filename to send: local_file.bin
-Enter filename to use on the server: server_file.bin
+Write 'exit' to disconnect from the server.
+Enter operation (get for download, put for upload): put
+
+Write 'exit' to return to main menu.
+Enter filename: FileA.jpg
+Enter blocksize (leave blank to skip):
 ```
 **Expected Output:**
 ```
-Connecting to TFTP server at 127.0.0.1:69...
+Negotiated blocksize: 512
+File size (tsize): 7944 bytes
+Starting upload of FileA.jpg (7944 bytes)...
 Upload complete!
 ```
 
@@ -108,33 +123,41 @@ Upload complete!
 
 ## Error Handling
 The client gracefully handles:
-- **Timeouts** (retries up to 3 times before aborting)
+- **Timeouts** (retries up to 5 times before aborting)
 - **File not found errors**
 - **Duplicate ACKs**
-- **Illegal TFTP operations**
 
 ---
 
 ## Testing the Client
 
-### 1. Handling Timeout (Server Not Responding)
+### 1. Handling Timeout (Server Not Responding) and Errors
 **Test Case:** Server is unreachable
-```bash
-python tftp_client.py
-```
+
 **Input:**
 ```
-Enter TFTP server IP address: 127.0.0.2  # Invalid IP
-Enter operation (get/put): get
-Enter filename to get from the server: test.bin
-Enter filename to use locally: local_test.bin
+Write 'exit' to disconnect from the server.
+Enter operation (get for download, put for upload): put
+
+Write 'exit' to return to main menu.
+Enter filename: testing.txt
+Enter blocksize (leave blank to skip):
 ```
 **Expected Output:**
 ```
-Warning: Timeout occurred, retrying 1/3...
-Warning: Timeout occurred, retrying 2/3...
-Warning: Timeout occurred, retrying 3/3...
-Error: Maximum retries reached, aborting download.
+Negotiated blocksize: 512
+Starting upload of testing.txt (None bytes)...
+Error: Illegal TFTP operation
+Warning: Timeout occurred, retrying 1/5...
+Error: Illegal TFTP operation
+Warning: Timeout occurred, retrying 2/5...
+Error: Illegal TFTP operation
+Warning: Timeout occurred, retrying 3/5...
+Error: Illegal TFTP operation
+Warning: Timeout occurred, retrying 4/5...
+Error: Illegal TFTP operation
+Warning: Timeout occurred, retrying 5/5...
+Error: Maximum retries reached, aborting upload.
 ```
 
 ---
@@ -146,54 +169,39 @@ python tftp_client.py
 ```
 **Input:**
 ```
-Enter TFTP server IP address: 127.0.0.1
-Enter operation (get/put): get
-Enter filename to get from the server: missing.bin
-Enter filename to use locally: local_missing.bin
+Write 'exit' to disconnect from the server.
+Enter operation (get for download, put for upload): get
+
+Write 'exit' to return to main menu.
+Enter filename: dne.txt
+Enter blocksize (leave blank to skip):
 ```
 **Expected Output:**
 ```
-Error: The requested file was not found on the server.
-Server message: File not found
+No OACK received. Using default values.
+Starting download of dne.txt...
+Warning: Timeout occurred, retrying 1/5...
+Error: File not found
 ```
 
 ---
 
 ### 3. Handling Duplicate ACKs
 **Test Case:** Server sends duplicate ACKs
+
 **How to Simulate:** Modify the TFTP server to send duplicate ACKs.
 
 **Expected Output:**
 ```
-Warning: Unexpected ACK 2, expected 1. Retrying...
-Warning: Unexpected ACK 3, expected 2. Retrying...
+Warning: Unexpected packet received, retrying...
+Warning: Timeout occurred, retrying 1/5...
+Warning: Unexpected packet received, retrying...
+Warning: Timeout occurred, retrying 2/5...
+Warning: Unexpected packet received, retrying...
+Warning: Timeout occurred, retrying 3/5...
+Warning: Unexpected packet received, retrying...
+Warning: Timeout occurred, retrying 4/5...
+Warning: Unexpected packet received, retrying...
+Warning: Timeout occurred, retrying 5/5...
+Error: Maximum retries reached, aborting upload.
 ```
-
----
-
-### 4. Handling Invalid TFTP Packets
-**Test Case:** Server sends an unexpected opcode
-**How to Simulate:** Use Wireshark to capture invalid packets or modify a server.
-**Expected Output:**
-```
-Error: Illegal TFTP operation detected.
-Server message: Illegal operation
-```
-
----
-
-## Wireshark Packet Capture for TFTP
-To analyze the TFTP communication, use **Wireshark** and filter:
-```
-udp port 69
-```
-
-### Expected Wireshark Output (Download)
-| No.| Source     | Destination | Protocol| Info                             |
-|----|------------|-------------|---------|----------------------------------|
-| 1  | 127.0.0.1  | 127.0.0.1   | TFTP    | Read Request (RRQ)               |
-| 2  | 127.0.0.1  | 127.0.0.1   | TFTP    | Option Acknowledgment (OACK)     |
-| 3  | 127.0.0.1  | 127.0.0.1   | TFTP    | Data Block #1 (512 bytes)        |
-| 4  | 127.0.0.1  | 127.0.0.1   | TFTP    | Acknowledgment (ACK) Block #1    |
-| 5  | 127.0.0.1  | 127.0.0.1   | TFTP    | Final Data Block #N (<512 bytes) |
-| 6  | 127.0.0.1  | 127.0.0.1   | TFTP    | Acknowledgment (ACK) Final Block |
