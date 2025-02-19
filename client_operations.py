@@ -46,7 +46,6 @@ def send_request(sock, server_ip, filename, mode, opcode, blocksize=None, tsize=
         request += b'tsize\x00' + str(tsize).encode() + b'\x00'
 
     # send the created packet to the server
-    print(f"Request Packet: {request}")
     sock.sendto(request, (server_ip, TFTP_PORT))
 
 def handle_oack(sock, addr, blocksize):
