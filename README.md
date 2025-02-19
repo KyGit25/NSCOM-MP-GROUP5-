@@ -55,7 +55,7 @@ This project is a **TFTP (Trivial File Transfer Protocol) client** implemented i
 
 3. **Create a test file for download**
    - Open **Notepad**, type "This is a test file", and save it as `test.txt`
-   - Place it in the **Current Directory** of tftpd32
+   - Place it in the **Current Directory** of where the server is located
 
 ---
 
